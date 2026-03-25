@@ -47,14 +47,19 @@
       pointer-events: none;
     }
 
-    /* 日付・デジタル時計エリア (右上) */
+    /* 配置用の共通クラス */
+    .pos-top-left { top: 10px; left: 20px; text-align: left; bottom: auto; right: auto; }
+    .pos-top-right { top: 10px; right: 20px; text-align: right; bottom: auto; left: auto; }
+    .pos-bottom-left { bottom: 10px; left: 20px; text-align: left; top: auto; right: auto; }
+    .pos-bottom-right { bottom: 10px; right: 20px; text-align: right; top: auto; left: auto; }
+
+    /* 日付・デジタル時計エリア */
     #time-area {
       position: absolute;
-      top: 25px;
-      right: 35px;
-      text-align: right;
       color: white;
       text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      padding: 15px;
+      z-index: 10;
     }
 
     #date {
@@ -71,12 +76,10 @@
       letter-spacing: 0.1em;
     }
 
-    /* 配信者名 (左上) */
+    /* 配信者名 */
     #name-area {
       position: absolute;
-      top: 0;
-      left: 10px;
-      padding: 30px; /* text-shadow(最大30px)が途切れないための余白 */
+      padding: 15px; /* text-shadowが途切れないための余白 */
       font-size: 3rem;
       font-weight: bold;
       text-shadow: 0 4px 10px rgba(0,0,0,0.5);
@@ -86,9 +89,8 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: calc(100vw - 450px); /* 右側の時計エリアと絶対に被らない十分な余裕を持たせる */
-      box-sizing: border-box; /* max-widthの計算にpaddingを含める */
-      z-index: 10; /* 他のレイヤーより確実に前面にする */
+      box-sizing: border-box;
+      z-index: 11; /* 時計より優先 */
       transform: translateZ(0); /* OBSのレンダリングバグ(表示消失)防止 */
     }
     
@@ -195,11 +197,48 @@
     const streamerName = params.get('name') || '';
     const customColor = params.get('custom'); // "#"が含まれる場合はURLエンコード (%23) されている必要がある
 
+    // 表示位置のパラメータ取得 (デフォルト: 配信者名=左下, 時計=右上)
+    const posMapping = {
+      '左上': 'top-left',
+      '右上': 'top-right',
+      '左下': 'bottom-left',
+      '右下': 'bottom-right',
+      'top-left': 'top-left',
+      'top-right': 'top-right',
+      'bottom-left': 'bottom-left',
+      'bottom-right': 'bottom-right'
+    };
+    
+    let namePos = posMapping[params.get('namePos')] || 'bottom-left';
+    let timePos = posMapping[params.get('timePos')] || 'top-right';
+
     const body = document.body;
     body.className = `theme-${theme}`;
+
+    const nameArea = document.getElementById('name-area');
+    const timeArea = document.getElementById('time-area');
     
     if (streamerName) {
-      document.getElementById('name-area').textContent = streamerName;
+      nameArea.textContent = streamerName;
+    }
+
+    // 表示位置のクラスを適用
+    nameArea.classList.add(`pos-${namePos}`);
+    timeArea.classList.add(`pos-${timePos}`);
+
+    // 位置が被った場合は配信者名を優先し、時計を非表示にする
+    const isSameRow = (namePos.startsWith('top') && timePos.startsWith('top')) || 
+                      (namePos.startsWith('bottom') && timePos.startsWith('bottom'));
+
+    if (namePos === timePos && streamerName) {
+      timeArea.style.display = 'none';
+      nameArea.style.maxWidth = 'calc(100vw - 40px)'; // ほぼ全幅使用可能
+    } else if (isSameRow) {
+      // 同じ高さにある場合は時計と被らないように幅を制限する
+      nameArea.style.maxWidth = 'calc(100vw - 400px)';
+    } else {
+      // 違う高さなら幅制限を緩める
+      nameArea.style.maxWidth = 'calc(100vw - 40px)';
     }
 
     // カスタムカラーの上書き
